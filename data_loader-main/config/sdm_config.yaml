@@ -1,0 +1,21 @@
+sdm_db:
+  host: 10.107.108.126
+  database: SDM
+  port: 5432
+  user: m13_dev
+  password: m13_dev_pw
+  schema: m13_dev
+load_data:
+  table_name: sie_mtr_raw_fc
+  start_date: 2024-08-20
+  end_date: 2024-08-21
+  start_time: T23:00:00.000Z # UTC 8am
+  end_time: T12:00:00.000Z  # UTC 8pm
+#  start_time: T16:00:00.000Z # UTC 12am
+#  end_time: T16:00:00.000Z  # UTC 12am
+data_pipe:
+  schedule: False
+  prod_only: True
+  table_list: sie_mtr_raw_fc
+  template: SEW_INVERTER_TEMPLATE
+# 4 sealer complete 6-10

@@ -1,0 +1,46 @@
+# Ignore a file or directory in the context root named "modules"
+modules
+
+# Ignore any files or directories within the subdirectory named "modules" 
+# in the context root
+modules/*
+
+# Ignore any files or directories in the context root beginning with "modules"
+modules*
+
+# Ignore any files or directories one level down from the context root named
+# "modules"
+*/modules
+
+# Ignore any files or directories at any level, including the context root, 
+**/modules
+**/.secrets
+**/data
+**/output
+**/logHTTP
+**/test
+**/__pycache__
+**/deployment
+**/shell_scripts
+**/helm_charts
+**/SAP_API
+
+# File types
+*.zip
+*.md
+*.log
+*.yml
+*.yaml
+*.Dockerfile
+*.bak
+
+# Specific scripts
+test*
+CPSInterface*
+main_local.py
+buildImageLocal.sh
+build_push.sh
+startServerContainer.sh
+Dockerfile
+
+sonar-project.properties

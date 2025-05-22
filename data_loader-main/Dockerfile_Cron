@@ -1,0 +1,53 @@
+FROM python:3.10-slim
+
+# Base Dockerfile
+# Expose the application to port 6666
+EXPOSE 6666
+
+# Install PostgreSQL development libraries and cron
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    cron \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the application code and CA certificate
+COPY . /app
+
+# Copy the cron file to the container
+COPY cronfile /etc/cron.d/mycron
+
+# Set the working directory
+WORKDIR /app
+
+# Create the directory for the volume mount point
+RUN mkdir -p /M13/data_pipeline_cron
+
+# Update the package list, install necessary packages, and update CA certificates
+RUN apt-get update
+RUN apt-get install -y ca-certificates
+RUN update-ca-certificates
+
+# Install tools
+RUN apt-get install -y openssh-client vim-tiny
+
+# Upgrade pip and configure it to use the custom CA certificate
+RUN pip install --upgrade pip
+
+# Install the Python dependencies
+RUN pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt
+
+# Give execution rights on the cron job
+RUN chmod 0644 /etc/cron.d/mycron
+
+# Apply the cron job
+RUN crontab /etc/cron.d/mycron
+
+# Ensure cron runs as a background process
+RUN touch /var/log/cron.log
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=0
+
+# Start cron and the main application
+CMD cron && tail -f /var/log/cron.log
