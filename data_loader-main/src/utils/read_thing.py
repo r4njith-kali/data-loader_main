@@ -177,7 +177,7 @@ class GetThings(object):
     def thing_value(self, thingName: str) -> pd.DataFrame():
         """
         Read value, timestamp and quality flag of given ThingName
-        URL Example: http://10.107.108.136/Thingworx/Things/FC1_DMM11-SVM11/PropertiesVTQ/
+        URL Example: https://thingworx.example.com/Thingworx/Things/FC1_DMM11-SVM11/PropertiesVTQ/
         Args:
             thingName: thing name from Things
         Returns:
@@ -276,7 +276,7 @@ class GetThings(object):
     def thing_info(self, thingName: str) -> pd.DataFrame():
         """
         Read value, timestamp and quality flag of given ThingName
-        URL Example: http://10.107.108.136/Thingworx/Things/FC1_DMM11-SVM11/Properties/
+        URL Example: https://thingworx.example.com/Thingworx/Things/FC1_DMM11-SVM11/Properties/
         Args:
             thingName: thing name from Things
         Returns:
