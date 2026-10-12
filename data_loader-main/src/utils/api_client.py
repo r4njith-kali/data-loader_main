@@ -1,150 +1,157 @@
 
-import json
+"""HTTP client for ThingWorx REST API integrations."""
+
+import logging
+import os
+from pathlib import Path
+from typing import Any, Dict, Optional
+
 import requests
 import yaml
-import logging
-from definitions import CONFIG_DIR
+
+logger = logging.getLogger(__name__)
 
 
 class ApiClient:
+    """Configurable ThingWorx API client."""
 
-    def __init__(self, config_file: str = '', debug: bool = False):
-        logging.basicConfig()
-        self._logger = logging.getLogger(__class__.__name__)
-        self.url = None
-        self.api_key = None
+    def __init__(
+        self,
+        config_file: str = "",
+        debug: bool = False,
+        timeout: int = 30,
+        session: Optional[requests.Session] = None,
+    ):
+        self.url = ""
+        self.api_key = ""
+        self.proxies: Dict[str, str] = {}
+        self.timeout = timeout
+        self.session = session or requests.Session()
+
+        if debug:
+            logger.setLevel(logging.DEBUG)
+
         self.configure(config_file)
-        self.debug = debug
-        self.proxies = dict()
 
-    def configure(self, config_file):
-        """
-        Configures the client using a config file
-        Args:
-            config_file: the path of the config file, relative or absolute
-        """
+    def configure(self, config_file: str) -> None:
+        """Load connection settings from YAML and environment."""
+        if not config_file:
+            raise ValueError("A configuration file is required")
 
-        with open(config_file) as stream:
-            try:
-                configs = yaml.safe_load(stream)
+        with Path(config_file).open(encoding="utf-8") as stream:
+            config = yaml.safe_load(stream) or {}
 
-                if configs.get('debug') is True:
-                    self._logger.setLevel(logging.DEBUG)
+        if not isinstance(config, dict):
+            raise ValueError("API configuration must be a YAML mapping")
 
-                if 'proxy' in configs:
-                    self.proxies = {'https': configs['proxy']}
+        self.url = str(
+            os.getenv("THINGWORX_URL")
+            or config.get("host_url")
+            or ""
+        ).rstrip("/") + "/"
 
-                # Copy the authentication information
-                self.api_key = configs.get('api_key')
-                self.url = configs.get('host_url')
-            except yaml.YAMLError as e:
-                print(e)
+        self.api_key = str(
+            os.getenv("THINGWORX_API_KEY")
+            or config.get("api_key")
+            or ""
+        )
 
-    def get_request(self, api, parameters: dict = None) -> json:
-        """
-        Worker function to perform the GET request
-        Args:
-            api: API key
-            parameters:  API body in dictionary format
-        Returns:
-            json: GET response
-        """
+        if not self.url.strip("/"):
+            raise ValueError("ThingWorx host URL is missing")
 
-        # Set up headers
-        headers = dict()
-        headers['appKey'] = self.api_key
-        headers['Accept'] = 'application/json'
-        # Set up the URL
-        url = self.url + api
+        if not self.api_key:
+            raise ValueError("ThingWorx API key is missing")
 
-        # Send the request and get the response
-        response = requests.get(url, headers=headers, params=parameters, proxies=self.proxies)
+        proxy = config.get("proxy")
+        self.proxies = {"https": proxy} if proxy else {}
 
-        # Parse the response into json format
-        response_json = json.loads(response.content)
+        if config.get("debug"):
+            logger.setLevel(logging.DEBUG)
 
-        # Return None if the response code indicates an error
-        if response.status_code != 200:
-            print('Error: Response Code', str(response.status_code), response_json)
-            return None
+    def _request(
+        self,
+        method: str,
+        api: str,
+        parameters: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """Execute an HTTP request and decode its JSON response."""
+        url = self.url + api.lstrip("/")
 
-        return response_json
+        headers = {
+            "appKey": self.api_key,
+            "Accept": "application/json",
+        }
 
-    def post_request(self, api, parameters: dict = None) -> json:
-        """
-        Worker function to perform the POST request
-        Args:
-            api: API key
-            parameters:  API body in dictionary format
-        Returns:
-            json: POST response
-        """
+        kwargs: Dict[str, Any] = {
+            "headers": headers,
+            "timeout": self.timeout,
+            "proxies": self.proxies,
+        }
 
-        # Set up headers & bodies
-        headers = dict()
-        headers['appKey'] = self.api_key
-        headers['Accept'] = 'application/json'
-        headers['Content-Type'] = 'application/json'
+        if method == "GET":
+            kwargs["params"] = parameters
+        elif method == "POST":
+            # Preserve the original client's query-parameter behavior.
+            headers["Content-Type"] = "application/json"
+            kwargs["params"] = parameters
+        elif method == "PUT":
+            # Preserve the original client's raw-body behavior.
+            headers["Content-Type"] = "application/json"
+            kwargs["data"] = parameters
 
-        # Set up the URL
-        url = self.url + api
+        try:
+            response = self.session.request(
+                method, url, **kwargs
+            )
+            response.raise_for_status()
 
-        # Send the request and get the response
-        response = requests.post(url, headers=headers, params=parameters)
-        # print('Response:', response.text)
+            if not response.content:
+                return None
 
-        # Parse the response into json format
-        response_json = json.loads(response.content)
+            return response.json()
 
-        # Return None if the response code indicates an error
-        if response.status_code != 200:
-            print('Error: Response Code', str(response.status_code), response_json)
-            return None
+        except requests.exceptions.Timeout as exc:
+            logger.error("ThingWorx request timed out: %s", method)
+            raise RuntimeError(
+                "ThingWorx API request timed out"
+            ) from exc
 
-        return response_json
+        except requests.exceptions.HTTPError as exc:
+            status = (
+                exc.response.status_code
+                if exc.response is not None
+                else "unknown"
+            )
+            logger.error(
+                "ThingWorx HTTP error: %s", status
+            )
+            raise RuntimeError(
+                f"ThingWorx API returned HTTP {status}"
+            ) from exc
 
-    def put_request(self, api, parameters: json = None) -> json:
-        """
-        Worker function to perform the PUT request
-        Args:
-            api: API key
-            parameters:  API body in dictionary format
-        Returns:
-            json: PUT response
-        """
+        except requests.exceptions.RequestException as exc:
+            logger.error("ThingWorx network request failed")
+            raise RuntimeError(
+                "ThingWorx API request failed"
+            ) from exc
 
-        # Set up headers & bodies
-        headers = dict()
-        headers['appKey'] = self.api_key
-        headers['Accept'] = 'application/json'
-        headers['Content-Type'] = 'application/json'
+        except ValueError as exc:
+            logger.error("ThingWorx returned invalid JSON")
+            raise ValueError(
+                "Invalid JSON returned by ThingWorx API"
+            ) from exc
 
-        # Set up the URL
-        url = self.url + api
+    def get_request(
+        self, api: str, parameters: Optional[dict] = None
+    ) -> Any:
+        return self._request("GET", api, parameters)
 
-        # Send the request and get the response
-        response = requests.put(url, headers=headers, data=parameters)
-        # print('Response:', response.text)
+    def post_request(
+        self, api: str, parameters: Optional[dict] = None
+    ) -> Any:
+        return self._request("POST", api, parameters)
 
-        # Parse the response into json format
-        response_json = json.loads(response.content)
-
-        # Return None if the response code indicates an error
-        if response.status_code != 200:
-            print('Error: Response Code', str(response.status_code), response_json)
-            return None
-
-        return response_json
-
-
-if __name__ == '__main__':
-    config = f'{CONFIG_DIR}/api_config.yaml'
-    client = ApiClient(config_file=config)
-    # print(client.get_request('Things/AlarmUtilities/Properties/AllTemplatesFromEDMS'))
-    # print(client.post_request('Things/FC1_DMM11-SVM11/Services/GetNumberPropertyValue/'))
-    # print(client.post_request('Things/FE4_SEALER_MCP_PS3/Services/GetPropertyValuesVTQA/'))
-    api_input = dict()
-    api_input['propertyName'] = 'IN_VOLTAGE'
-    post_req = client.post_request(api='Things/FE4_SEALER_MCP_PS3/Services/GetRemotePropertyBinding/',
-                                   parameters=api_input)
-    print(post_req['rows'][0]['aspects'])
+    def put_request(
+        self, api: str, parameters: Optional[dict] = None
+    ) -> Any:
+        return self._request("PUT", api, parameters)

@@ -30,7 +30,63 @@ class GetThings(object):
         self.status = list(map(str, asset_str))
         print('current time:', self.now)
 
+
     def thing_name(self, template: str = None) -> list:
+        """Retrieve unique Thing names from configured templates.
+
+        Args:
+            template: Template to query when templateFromConfig is False.
+
+        Returns:
+            List of unique Thing names in discovery order.
+        """
+        if self.templateFromConfig:
+            templates = self.templateName
+        else:
+            if not template:
+                raise ValueError(
+                    "A template name must be provided when "
+                    "templateFromConfig is False"
+                )
+            templates = [template]
+
+        things = []
+        seen = set()
+
+        for template_name in templates:
+            if not template_name:
+                continue
+
+            endpoint = (
+                f"ThingTemplates/{template_name}/ImplementingThings"
+            )
+
+            response = self.client.get_request(endpoint)
+
+            if not isinstance(response, dict):
+                raise ValueError(
+                    f"Unexpected API response for {template_name}"
+                )
+
+            rows = response.get("rows")
+
+            if not isinstance(rows, list):
+                raise ValueError(
+                    f"Missing or invalid rows for {template_name}"
+                )
+
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+
+                name = row.get("name")
+
+                if name and name not in seen:
+                    seen.add(name)
+                    things.append(name)
+
+        return things
+    
         """
         Extract Thing name from given template.
             Read from config or read from user input
