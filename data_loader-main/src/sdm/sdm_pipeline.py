@@ -10,6 +10,9 @@ from src.sdm.sdm_tbl import sie_mtr_raw, sew_mtr_raw, aircon_tbl
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+from src.sdm.bulk_loader import upsert_dataframe
+from sqlalchemy import inspect
+
 logger = get_logger(__name__)
 
 
@@ -141,7 +144,10 @@ class SDM_PIPELINE(object):
         from sdm_tbl import thing_info
 
         sql_dict, map_dict, sql_query, tbl_name = thing_info(schema=self.schema, tblName=self.table_name)
-        ret = self.insp.dialect.has_table(self.eng.connect(), tbl_name)
+        ret = inspect(self.eng).has_table(
+            raw_tbl,
+            schema=self.schema,
+            )
         if ret:
             sql = 'SELECT * FROM {schema}.{tbl}'.format(schema=self.schema, tbl=tbl_name)
             exist_data = pd.read_sql_query(sql, con=self.eng)
@@ -250,20 +256,38 @@ class SDM_PIPELINE(object):
                     if vs is not None:
                         vs = vs.rename(columns=map_dict)
                         vs['updated_timestamp'] = self.now
+
                         if ret:
-                            sql = ("SELECT * FROM {schema}.{tbl} WHERE thingworx_name = '{thing}'".
-                                   format(schema=self.schema, tbl=raw_tbl, thing=thing))
-                            exist_data = pd.read_sql_query(sql, con=self.eng)
-                            print('existing data\n', exist_data)
-                            print('existing data shape', exist_data.shape)
-                            new_data = vs.rename(columns=map_dict)
-                            print('new data shape', new_data.shape)
-                            new_data['updated_timestamp'] = self.now
-                            no_dup_df = new_data[~new_data['id'].isin(exist_data['id'])].copy()
-                            print('no_dup_df.shape', no_dup_df.shape)
-                            logger.info('Data write to SQL: ' + str(len(no_dup_df)))
-                            no_dup_df.to_sql(f'{raw_tbl}', con=self.eng, if_exists='append', schema=self.schema,
-                                             index=False, dtype=sql_dict)
+                            new_data = vs.copy()
+
+                            if "id" not in new_data.columns:
+                                raise ValueError(
+                                    "Telemetry records require an id column"
+                                )
+
+                            if new_data["id"].isna().any():
+                                raise ValueError(
+                                    "Telemetry IDs cannot contain null values"
+                                )
+
+                            inserted = upsert_dataframe(
+                                df=new_data,
+                                engine=self.eng,
+                                table_name=raw_tbl,
+                                schema=self.schema,
+                                conflict_columns=["id"],
+                                batch_size=1000,
+                                update_existing=False,
+                            )
+
+                            logger.info(
+                                "Telemetry ingestion completed: "
+                                "table=%s equipment=%s extracted=%d inserted=%d",
+                                raw_tbl,
+                                thing,
+                                len(new_data),
+                                inserted,
+                            )
                         else:
                             logger.warning('Table not found in schema: ' + raw_tbl)
                             print(f'{raw_tbl} not found in {self.schema} schema')
