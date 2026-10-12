@@ -1,10 +1,10 @@
 sdm_db:
-  host: 10.107.108.126
-  database: SDM
-  port: 5432
-  user: m13_dev
-  password: m13_dev_pw
-  schema: m13_dev
+  host: "localhost"
+  database: "industrial_iot"
+  port: 5433
+  user: "etl_user"
+  password: "REPLACE_WITH_ENVIRONMENT_VARIABLE"
+  schema: "public"
 load_data:
   table_name: sie_mtr_raw_fc
   start_date: 2024-08-20

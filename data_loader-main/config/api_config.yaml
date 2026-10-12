@@ -1,5 +1,5 @@
-host_url: 'http://10.107.108.136/Thingworx/'
-api_key: 2dce3f8b-5815-4f30-a69d-e6c5bf191aee
+host_url: "https://thingworx.example.com/Thingworx/"
+api_key: "REPLACE_WITH_ENVIRONMENT_VARIABLE"
 project: HMGICS.EDMS.RIMS.M13
 entity: Things
 template_type: EDMS
