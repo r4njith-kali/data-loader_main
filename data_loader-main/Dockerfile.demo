@@ -1,0 +1,21 @@
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+
+COPY requirements-demo.txt .
+
+RUN pip install --no-cache-dir -r requirements-demo.txt
+
+# Modernized ETL modules and tests
+COPY src/ ./src/
+COPY tests/ ./tests/
+
+# Legacy modules required by the original ThingWorx integration
+COPY definitions.py ./definitions.py
+
+CMD ["python", "-m", "src.demo.pipeline"]

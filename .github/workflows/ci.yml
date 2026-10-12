@@ -1,0 +1,50 @@
+
+name: Industrial IoT ETL CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Python Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: etl_user
+          POSTGRES_PASSWORD: local_demo_only
+          POSTGRES_DB: industrial_iot
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U etl_user -d industrial_iot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg2://etl_user:local_demo_only@localhost:5433/industrial_iot
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: data_loader-main/requirements-demo.txt
+
+      - name: Install dependencies
+        working-directory: data_loader-main
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-demo.txt
+
+      - name: Run automated tests
+        working-directory: data_loader-main
+        run: python -m pytest tests/ -v
