@@ -103,7 +103,3 @@ The local synthetic pipeline and mocked API responses are **test fixtures**, not
 - Do not point this repository at a live manufacturing environment without a separate security, configuration and operational review.
 
 For deeper context, see [Architecture](docs/architecture.md) and [Engineering case study](docs/engineering-case-study.md).
-
-## Attribution
-
-This repository contains internship-era code with existing source-file author headers. Preserve original authorship and any applicable employer permissions when describing individual contributions. The deployment context and subsequent modernization are documented separately to avoid attributing every historical file or later change to the same development period.

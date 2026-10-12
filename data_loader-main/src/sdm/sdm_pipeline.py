@@ -1,4 +1,4 @@
-# Created by aaronkueh at 7/8/24
+
 import time
 
 from definitions import CONFIG_DIR

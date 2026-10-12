@@ -1,4 +1,4 @@
-# Created by aaronkueh at 5/4/24
+
 import os
 import sys
 from pathlib import Path
